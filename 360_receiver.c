@@ -31,13 +31,14 @@
 #define WRITE_PIN(pin, value) (value ? SET_PIN(OUT_REG, pin) : CLR_PIN(OUT_REG, pin))
 
 // Commands for controlling the xbox controller module.
-const uint16_t leds_cmd = 0x0084;     // Initializes the LEDs, leaving the center LED lit.
-const uint16_t anim_cmd = 0x0085;     // Makes the startup animation on the ring of light.
-const uint16_t sync_cmd = 0x0004;     // Initiates the sync process.
-const uint16_t ctrl_off_cmd = 0x0009; // Turn off all controllers.
+static const uint16_t leds_cmd = 0x0084;     // Initializes the LEDs, leaving the center LED lit.
+static const uint16_t anim_cmd = 0x0085;     // Makes the startup animation on the ring of light.
+static const uint16_t sync_cmd = 0x0004;     // Initiates the sync process.
+static const uint16_t ctrl_off_cmd = 0x0009; // Turn off all controllers.
 
-volatile uint32_t millis_value = 0;      // Variable for storing current timer value in milliseconds.
-const uint16_t long_press_length = 2000; // Length of a long press in milliseconds.
+static const uint16_t long_press_length = 2000;      // Length of a long press in milliseconds.
+static volatile uint32_t button_status = 0xFFFFFFFF; // Button press status for debouncing.
+static volatile uint32_t millis_value;               // Button press duration in milliseconds.
 
 void send_data(uint16_t cmd)
 {
@@ -64,17 +65,25 @@ void send_data(uint16_t cmd)
 	WRITE_PIN(data_pin, 0);     // Pull pin low.
 }
 
-// Empty interrupt vector for INT0 (button press).
-EMPTY_INTERRUPT(INT0_vect);
+// Interrupt vector for INT0 (button press).
+ISR(INT0_vect)
+{
+	// Disable further interrupts on INT0.
+	INT_REG &= ~(1 << INT0);
+}
 
+// Interrupt vector for Timer1, triggers every millisecond.
 ISR(TIMER1_COMPA_vect)
 {
+	// Increment millisecond counter.
 	millis_value++;
+	// Update button status (used for debouncing).
+	button_status = (button_status << 1) | READ_PIN(button_pin);
 }
 
 void timer_init()
 {
-	// Set Output Compare Register so that it matches every millisecond TODO Bättre kommentar
+	// Set Output Compare Register to match with timer counter every millisecond.
 	OCR1C = 125;
 	// Enable Clear Timer on Compare Match.
 	TCCR1 = (1 << CTC1);
@@ -99,14 +108,19 @@ void timer_reset()
 
 void sleep()
 {
-	// Set sleep mode.
-	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-	// Enable interrupt on low INT0 (pin 2, physical pin 6 on ATtiny).
+	// Disable global interrupts to avoid race condition with INT0-interrupt.
+	cli();
+	// Reset millisecond counter.
+	millis_value = 0;
+	// Set button_status value to avoid premature button release condition.
+	button_status = 0xFFFFFFFE;
+	// Enable interrupt on low INT0 (button_pin).
 	INT_REG |= (1 << INT0);
-	// Enable sleep and enter sleep mode.
-	sleep_mode();
-	// Disable further interrupts on INT0 until entering sleep again.
-	INT_REG &= ~(1 << INT0);
+	sleep_enable();
+	// The instruction following sei() will always run before any interrupts are triggered.
+	sei();
+	sleep_cpu();
+	sleep_disable();
 }
 
 int main(void) {
@@ -115,50 +129,42 @@ int main(void) {
 
 	// Wait for xbox module to be ready for communitation.
 	_delay_ms(100);
-
 	// Initialize xbox module LEDs.
 	send_data(leds_cmd);
 
 	// Boolean indicating if the current button press is a long press.
-	bool long_press_active = false;
+	bool long_press = false;
 
 	// Setup registers controlling Timer/Counter1.
 	timer_init();
-
 	// Start timer measuring length of button press.
 	timer_start();
-
-	// Enable interrupts.
-	sei();
+	// Set sleep mode.
+	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+	// Sleep awaiting button press.
+	sleep();
 
 	// Main loop.
 	while (1) {
-		// Sleep awaiting button press.
-		sleep();
-
-		// Reset millisecond counter.
-		millis_value = 0;
-
-		// Simple debounce.
-		_delay_ms(50);
-
-		// Wait for button to be released or be held long enough for a long press.
-		while (!long_press_active && READ_PIN(button_pin) == 0) {
+		// Check for long press condition while button is held down.
+		if (!long_press && button_status == 0x00000000) {
 			if (millis_value >= long_press_length) {
-				long_press_active = true;
+				// Pair controllers on long press.
+				send_data(sync_cmd);
+				long_press = true;
 			}
+		// Check if button has been released.
+		} else if (button_status == 0xFFFFFFFF) {
+			if (!long_press) {
+				// Turn off controllers on short press.
+				send_data(ctrl_off_cmd);
+			}
+
+			// Reset long press status.
+			long_press = false;
+			// Sleep awaiting next button press.
+			sleep();
 		}
 
-		if (long_press_active) {
-			// Reset boolean and pair controllers on long press.
-			long_press_active = false;
-			send_data(sync_cmd);
-		} else {
-			// Turn off controllers on short press.
-			send_data(ctrl_off_cmd);
-		}
-
-		// Wait for button to be released before sleeping again.
-		while (READ_PIN(button_pin) == 0) {}
 	}
 }
