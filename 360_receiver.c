@@ -1,11 +1,3 @@
-// Define device if not already defined
-//#ifndef __AVR_ATtiny85__
-//#define __AVR_ATtiny85__
-//#endif
-//#ifndef __AVR_ATmega328P__
-//#define __AVR_ATmega328P__
-//#endif
-
 #include <math.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -14,16 +6,11 @@
 #include <avr/sleep.h>
 #include <util/delay.h>
 #include "360_receiver.h"
+#include "360_commands.h"
 
-// Commands for controlling the xbox controller module.
-static const uint16_t leds_cmd = 0x0084;     // Initializes the LEDs, leaving the center LED lit.
-static const uint16_t anim_cmd = 0x0085;     // Makes the startup animation on the ring of light.
-static const uint16_t sync_cmd = 0x0004;     // Initiates the sync process.
-static const uint16_t ctrl_off_cmd = 0x0009; // Turn off all controllers.
-
-static const uint16_t long_press_length = 2000;      // Length of a long press in milliseconds.
-static volatile uint32_t button_status = 0xFFFFFFFF; // Button press status for debouncing.
-static volatile uint32_t millis_value;               // Button press duration in milliseconds.
+const uint16_t long_press_length = 2000;      // Length of a long press in milliseconds.
+volatile uint32_t button_status = 0xFFFFFFFF; // Button press status for debouncing.
+volatile uint32_t millis_value;               // Button press duration in milliseconds.
 
 void send_data(uint16_t cmd)
 {
@@ -117,7 +104,7 @@ int main(void)
 	// Wait for xbox module to be ready for communitation.
 	_delay_ms(100);
 	// Initialize xbox module LEDs.
-	send_data(leds_cmd);
+	send_data(CMD_LEDS);
 
 	// Boolean indicating if the current button press is a long press.
 	bool long_press = false;
@@ -137,14 +124,14 @@ int main(void)
 		if (!long_press && button_status == 0x00000000) {
 			if (millis_value >= long_press_length) {
 				// Pair controllers on long press.
-				send_data(sync_cmd);
+				send_data(CMD_SYNC);
 				long_press = true;
 			}
 		// Check if button has been released.
 		} else if (button_status == 0xFFFFFFFF) {
 			if (!long_press) {
 				// Turn off controllers on short press.
-				send_data(ctrl_off_cmd);
+				send_data(CMD_CTRL_OFF);
 			}
 
 			// Reset long press status.

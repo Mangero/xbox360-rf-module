@@ -6,7 +6,7 @@ OBJ=${BIN}.o
 
 # Programming
 MCU=attiny85
-CPU_FREQ=1000000UL
+CPU_FREQ=8000000UL
 #MCU=atmega328p
 #CPU_FREQ=16000000UL
 PORT=/dev/ttyACM0
