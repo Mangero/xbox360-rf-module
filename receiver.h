@@ -1,6 +1,15 @@
-// 360_receiver.h
-#ifndef _360_RECEIVER_H_
-#define _360_RECEIVER_H_ 1
+/*******************************************************************************
+ * File: receiver.h
+ *
+ * Defines for microcontroller register names.
+ * Macros for reading from and writing to individual pins on the controllers.
+ ******************************************************************************/
+
+#ifndef XBOX360_RECEIVER_H
+#define XBOX360_RECEIVER_H 1
+
+// Include math for log function.
+#include <math.h>
 
 // Board specific defines.
 #if defined (__AVR_ATtiny25__) || defined (__AVR_ATtiny45__) || defined (__AVR_ATtiny85__)
@@ -29,7 +38,7 @@
       defined (__AVR_ATmega88A__)  || defined (__AVR_ATmega88PA__)  || \
       defined (__AVR_ATmega168A__) || defined (__AVR_ATmega168PA__) || \
       defined (__AVR_ATmega328__)  || defined (__AVR_ATmega328P__)
-	#define PRESCALE_SELECT 5 // TODO Gör dynamisk
+	#define PRESCALE_SELECT 5 // TODO Make dynamic
 	#define INT_REG EIMSK    // Register controlling interrupt behaviour.
 	#define TIMER_COMP_VECT TIMER2_COMPB_vect // Timer compare vector.
 
@@ -56,4 +65,4 @@
 #define READ_PIN(pin)         ((IN_REG >> (pin)) & 0x01)
 #define WRITE_PIN(pin, value) ((value) ? SET_PIN(OUT_REG, (pin)) : CLR_PIN(OUT_REG, (pin)))
 
-#endif // _360_RECEIVER_H_
+#endif // XBOX360_RECEIVER_H

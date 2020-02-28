@@ -1,12 +1,18 @@
-#include <math.h>
+/*******************************************************************************
+ * File: receiver.c
+ *
+ * Code for handling button interrupts and sending commands
+ * to the Xbox360 module.
+ ******************************************************************************/
+
 #include <inttypes.h>
 #include <stdbool.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <avr/sleep.h>
 #include <util/delay.h>
-#include "360_receiver.h"
-#include "360_commands.h"
+#include "receiver.h"
+#include "commands.h"
 
 const uint16_t long_press_length = 2000;      // Length of a long press in milliseconds.
 volatile uint32_t button_status = 0xFFFFFFFF; // Button press status for debouncing.
@@ -124,7 +130,7 @@ int main(void)
 		if (!long_press && button_status == 0x00000000) {
 			if (millis_value >= long_press_length) {
 				// Pair controllers on long press.
-				send_data(CMD_SYNC);
+				send_data(CMD_PAIR);
 				long_press = true;
 			}
 		// Check if button has been released.

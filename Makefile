@@ -1,5 +1,5 @@
 # Filenames
-BIN=360_receiver
+BIN=receiver
 IDIR=/usr/lib/avr/include
 BUILD_DIR=./build
 OBJ=${BIN}.o
